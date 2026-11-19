@@ -8,9 +8,11 @@ ARG PCRE2_VERSION=10.49
 ARG ZLIB_VERSION=1.4
 ARG LIBMAXMINDDB_VERSION=1.12.2
 ARG GEOIP_VERSION=1.6.12
+ARG LIBXML2_VERSION=2.15.4
 ARG NGX_BROTLI_COMMIT=a71f9312c2deb28875acc7bacfdd5695a111aa53
 ARG NGX_GEOIP2_COMMIT=445df24ef3781e488cee3dfe8a1e111997fc1dfe
 ARG NGX_SUBS_FILTER_COMMIT=e12e965ac1837ca709709f9a26f572a54d83430e
+ARG NGX_DAV_EXT_COMMIT=f5e30888a256136d9c550bf1ada77d6ea78a48af
 
 RUN apk add --no-cache build-base ca-certificates cmake curl git linux-headers patch perl
 
@@ -56,6 +58,19 @@ RUN git clone https://github.com/leev/ngx_http_geoip2_module.git \
     && git clone https://github.com/yaoweibin/ngx_http_substitutions_filter_module.git \
     && git -C ngx_http_substitutions_filter_module checkout --detach "${NGX_SUBS_FILTER_COMMIT}"
 
+RUN curl -fSL --retry 3 -o libxml2.tar.xz \
+      "https://download.gnome.org/sources/libxml2/${LIBXML2_VERSION%.*}/libxml2-${LIBXML2_VERSION}.tar.xz" \
+    && tar -xf libxml2.tar.xz \
+    && cd "libxml2-${LIBXML2_VERSION}" \
+    && CFLAGS="-O2 -fPIC" ./configure --enable-static --disable-shared --without-python --without-zlib --without-icu \
+    && make -j"$(nproc)" \
+    && make install
+
+# DAV Ext uses libxml2 directly. Its upstream LIBXSLT hook is optional.
+RUN git clone https://github.com/arut/nginx-dav-ext-module.git \
+    && git -C nginx-dav-ext-module checkout --detach "${NGX_DAV_EXT_COMMIT}" \
+    && sed -i 's/^ngx_module_libs=LIBXSLT$/ngx_module_libs="-lxml2 -lm"/' nginx-dav-ext-module/config
+
 RUN curl -fSL --retry 3 -o nginx.tar.gz "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" \
     && tar -xzf nginx.tar.gz
 
@@ -85,7 +100,8 @@ RUN ./configure \
       --add-module=/build/ngx_http_substitutions_filter_module \
       --add-module=/build/ngx_brotli \
       --add-module=/build/ngx_http_geoip2_module \
-      --with-cc-opt="-fPIC -I/usr/local/include" \
+      --add-module=/build/nginx-dav-ext-module \
+      --with-cc-opt="-fPIC -I/usr/local/include -I/usr/local/include/libxml2" \
       --with-openssl-opt="no-dso no-async no-tests -fPIC" \
       --with-ld-opt="-static -L/usr/local/lib" \
     && make -j"$(nproc)" \
