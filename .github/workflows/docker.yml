@@ -13,6 +13,7 @@ on:
       - Dockerfile
       - docker-entrypoint.sh
       - docker-compose.yml
+      - compose-up.sh
       - .github/workflows/docker.yml
   schedule:
     - cron: '17 */6 * * *'
@@ -134,10 +135,9 @@ jobs:
           cache-from: type=gha,scope=nginx-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=nginx-${{ matrix.arch }}
 
-      - name: Test Compose startup, persistent directories, and reload
+      - name: Test Compose startup as www-data and reload
         run: |
           data_dir=/opt/nginx
-          sudo install -d -o "$(id -u)" -g "$(id -g)" "$data_dir"/{conf,logs,html}
           docker compose config --quiet
           cleanup() {
             docker compose logs
@@ -145,18 +145,20 @@ jobs:
           }
           trap cleanup EXIT
 
-          docker compose up --detach --pull never
+          ./compose-up.sh --pull never
+          test "$(docker compose exec -T nginx id -u)" = "$(id -u www-data)"
+          test "$(docker compose exec -T nginx id -g)" = "$(id -g www-data)"
           curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
             http://127.0.0.1/ >/dev/null
           test -s "$data_dir/conf/nginx.conf"
           test -s "$data_dir/logs/access.log"
           docker compose exec -T nginx nginx -V 2>&1 | grep -F "nginx/$VERSION"
-          printf '%s\n' 'persistent file' > "$data_dir/html/compose-check.txt"
+          printf '%s\n' 'persistent file' | sudo -u www-data tee "$data_dir/html/compose-check.txt" >/dev/null
           docker compose restart
           curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
             http://127.0.0.1/compose-check.txt | grep -Fx 'persistent file'
 
-          cat > "$data_dir/conf/compose-reload.conf" <<'NGINX'
+          sudo -u www-data tee "$data_dir/conf/compose-reload.conf" >/dev/null <<'NGINX'
           events {}
           http {
               server {
@@ -165,7 +167,7 @@ jobs:
               }
           }
           NGINX
-          mv "$data_dir/conf/compose-reload.conf" "$data_dir/conf/nginx.conf"
+          sudo -u www-data mv "$data_dir/conf/compose-reload.conf" "$data_dir/conf/nginx.conf"
           docker compose exec -T nginx nginx -t
           docker compose exec -T nginx nginx -s reload
           curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 1 \

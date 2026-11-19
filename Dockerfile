@@ -110,7 +110,12 @@ COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN mkdir -p /usr/local/share/nginx-defaults \
     && cp -a conf html /usr/local/share/nginx-defaults/ \
     && nginx -V \
-    && nginx -t
+    && nginx -t \
+    && rm -rf /opt/nginx/temp/* \
+    && chmod 1777 /opt/nginx/temp \
+    && apk add --no-cache --virtual .setcap libcap-setcap \
+    && setcap cap_net_bind_service=+ep /opt/nginx/sbin/nginx \
+    && apk del .setcap
 
 STOPSIGNAL SIGQUIT
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

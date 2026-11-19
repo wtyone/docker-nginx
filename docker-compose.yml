@@ -2,6 +2,7 @@ services:
   nginx:
     image: mxflare/nginx:latest
     network_mode: host
+    user: "${WWW_DATA_USER:-0:0}"
     restart: unless-stopped
     volumes:
       - /opt/nginx/conf:/opt/nginx/conf
