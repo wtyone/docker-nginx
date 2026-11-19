@@ -1,0 +1,9 @@
+services:
+  nginx:
+    image: ${NGINX_IMAGE:-mxflare/nginx:latest}
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ${NGINX_DATA_DIR:-/opt/nginx}/conf:/opt/nginx/conf
+      - ${NGINX_DATA_DIR:-/opt/nginx}/logs:/opt/nginx/logs
+      - ${NGINX_DATA_DIR:-/opt/nginx}/html:/opt/nginx/html
