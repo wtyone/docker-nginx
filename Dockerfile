@@ -58,7 +58,8 @@ RUN git clone https://github.com/leev/ngx_http_geoip2_module.git \
     && git clone https://github.com/yaoweibin/ngx_http_substitutions_filter_module.git \
     && git -C ngx_http_substitutions_filter_module checkout --detach "${NGX_SUBS_FILTER_COMMIT}"
 
-RUN curl -fSL --retry 3 -o libxml2.tar.xz \
+RUN apk add --no-cache pkgconf \
+    && curl -fSL --retry 3 -o libxml2.tar.xz \
       "https://download.gnome.org/sources/libxml2/${LIBXML2_VERSION%.*}/libxml2-${LIBXML2_VERSION}.tar.xz" \
     && tar -xf libxml2.tar.xz \
     && cd "libxml2-${LIBXML2_VERSION}" \
