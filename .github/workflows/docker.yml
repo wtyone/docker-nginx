@@ -182,13 +182,13 @@ jobs:
             http://127.0.0.1/compose-reload-check | grep -Fx 'reloaded'
 
           dav_url=http://127.0.0.1/compose-dav/first/second/check.txt
-          curl --fail --silent --show-error --request PUT --data-binary 'nested file' \
-            "$dav_url" >/dev/null
-          test "$(curl --fail --silent --show-error "$dav_url")" = 'nested file'
+          dav_curl=(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1)
+          "${dav_curl[@]}" --request PUT --data-binary 'nested file' "$dav_url" >/dev/null
+          test "$("${dav_curl[@]}" "$dav_url")" = 'nested file'
 
-          curl --fail --silent --show-error --request OPTIONS --dump-header - --output /dev/null "$dav_url" \
+          "${dav_curl[@]}" --request OPTIONS --dump-header - --output /dev/null "$dav_url" \
             | grep -i '^Allow:.*PROPFIND'
-          status=$(curl --fail --silent --show-error --request PROPFIND \
+          status=$("${dav_curl[@]}" --request PROPFIND \
             --header 'Depth: 0' --header 'Content-Type: application/xml' \
             --data-binary '<D:propfind xmlns:D="DAV:"><D:allprop/></D:propfind>' \
             --output "$RUNNER_TEMP/dav-properties.xml" --write-out '%{http_code}' "$dav_url")
